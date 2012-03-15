@@ -1,0 +1,46 @@
+# -*- encoding: utf-8 -*-
+# Author:: Couchbase <info@couchbase.com>
+# Copyright:: 2011, 2012 Couchbase, Inc.
+# License:: Apache License, Version 2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+$:.push File.expand_path('../lib', __FILE__)
+require 'em-couchbase/version'
+
+Gem::Specification.new do |s|
+  s.name        = 'em-couchbase'
+  s.version     = EventMachine::Protocols::Couchbase::VERSION
+  s.author      = 'Couchbase'
+  s.email       = 'support@couchbase.com'
+  s.license     = 'ASL-2'
+  s.homepage    = 'http://couchbase.org'
+  s.summary     = %q{An EventMachine-based Couchbase ruby driver}
+  s.description = %q{The official client library built atop of EventMachine for use with Couchbase Server.}
+
+  s.files         = `git ls-files`.split("\n")
+  s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
+  s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
+  s.extensions    = `git ls-files -- ext/**/extconf.rb`.split("\n")
+  s.require_paths = ['lib']
+
+  s.add_runtime_dependency 'yajl-ruby', '~> 1.1.0'
+  s.add_runtime_dependency 'em-http-request', '~> 1.0.1'
+
+  s.add_development_dependency 'rake', '~> 0.8.7'
+  s.add_development_dependency 'minitest'
+  s.add_development_dependency 'rdiscount'
+  s.add_development_dependency 'yard'
+  s.add_development_dependency RUBY_VERSION =~ /^1\.9/ ? 'ruby-debug19' : 'ruby-debug'
+end
