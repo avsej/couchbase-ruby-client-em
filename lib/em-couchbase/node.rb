@@ -49,10 +49,14 @@ module EventMachine
         def receive_data(data)
           @data << data
           Packet.parse(@data) do |op, opaque, result|
-            if op == :sasl_auth
-              raise result.error unless result.success?
+            if result.error.class == Error::NotMyVbucket
+              client.retry(:not_my_vbucket, opaque)
             else
-              client.run_callback(opaque, result)
+              if op == :sasl_auth
+                raise result.error unless result.success?
+              else
+                client.run_callback(opaque, result)
+              end
             end
           end
         end
@@ -63,6 +67,7 @@ module EventMachine
                                 options[:flags],
                                 options[:expiration],
                                 options[:cas])
+          client.register_packet(opaque, packet)
           send_data(packet)
         end
 
@@ -72,7 +77,9 @@ module EventMachine
         def get(tuples, options = {})
           packets = ""
           tuples.each do |opaque, vbucket, key|
-            packets << Packet.build(opaque, vbucket, :get, key)
+            packet = Packet.build(opaque, vbucket, :get, key)
+            client.register_packet(opaque, packet)
+            packets << packet
           end
           send_data(packets)
         end

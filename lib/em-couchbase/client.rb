@@ -30,7 +30,8 @@ module EventMachine
         def initialize
           @opaque = 0
           @nodes = []
-          @handlers = {}
+          @packets = {}
+          @upgrade_queue = EM::Queue.new
         end
 
         # @param options [Hash]
@@ -51,14 +52,50 @@ module EventMachine
                 nodes[ii] = Node.connect(options)
               end
             end
+            do_retry = lambda do |packet|
+              opaque, key, handler, raw = packet.values_at(:opaque, :key, :handler, :raw)
+              register_handler(opaque, key, handler)
+              vbucket, node = locate(key)
+              raw[6...7] = [vbucket].pack("n")
+              register_packet(opaque, raw)
+              node.callback do
+                node.send_data(raw)
+              end
+              @upgrade_queue.pop(&do_retry)
+            end
+            @upgrade_queue.pop(&do_retry)
             succeed
           end
           @config_listener.listen(options)
           self
         end
 
+        def register_packet(opaque, packet)
+          if packet.respond_to?(:force_encoding)
+            packet.force_encoding(Encoding::BINARY)
+          end
+          (@packets[opaque] ||= {})[:raw] = packet
+        end
+
+        def register_handler(opaque, key, handler)
+          packet = (@packets[opaque] ||= {})
+          packet[:key] = key
+          packet[:handler] = handler
+        end
+
+        def retry(reason, opaque)
+          packet = @packets.delete(opaque)
+          if packet
+            case reason
+            when :not_my_vbucket
+              @upgrade_queue.push([opaque, packet])
+            end
+          end
+        end
+
         def run_callback(opaque, result)
-          key, handler = @handlers.delete(opaque)
+          packet = @packets.delete(opaque)
+          key, handler = packet.values_at(:key, :handler)
           if handler.respond_to?(:call)
             result.key = key
             handler.call(result)
@@ -77,7 +114,7 @@ module EventMachine
         def set(key, val, options = {}, &block)
           callback do
             opaque = opaque_inc
-            @handlers[opaque] = [key, block]
+            register_handler(opaque, key, block)
             vbucket, node = locate(key)
             node.callback do
               node.set(opaque, vbucket, key, val, options)
@@ -92,7 +129,7 @@ module EventMachine
             end
             groups = keys.inject({}) do |acc, key|
               opaque = opaque_inc
-              @handlers[opaque] = [key, block]
+              register_handler(opaque, key, block)
               vbucket, node = locate(key)
               acc[node] ||= []
               acc[node] << [opaque, vbucket, key]
