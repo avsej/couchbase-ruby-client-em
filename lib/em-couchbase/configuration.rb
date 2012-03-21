@@ -102,7 +102,7 @@ module EventMachine
               :admin => admin,
               :proxy => admin.sub(/:\d+$/, ":#{ports.fetch("proxy")}"),
               :direct => admin.sub(/:\d+$/, ":#{ports.fetch("direct")}"),
-              :couch => node.fetch("couchApiBase"),
+              :couch => node["couchApiBase"], # nil for 1.8.x series
               :status => node.fetch("status"),
               :version => node.fetch("version")
             }
