@@ -42,6 +42,7 @@ module EventMachine
 
       class ConfigurationListener
         attr_reader :on_upgrade
+        attr_reader :config_stream
 
         def initialize
           @parser = Yajl::Parser.new
@@ -59,6 +60,13 @@ module EventMachine
           @on_upgrade = callback
         end
 
+        def on_error(&callback)
+          @on_error = callback
+          if @config_stream
+            @config_stream.errback(&callback)
+          end
+        end
+
         def listen(options = {})
           params = {:head => {}}
           if options[:username] && options[:password]
@@ -70,7 +78,11 @@ module EventMachine
             options[:pool] || "default",
             options[:bucket] || "default"
           ]
-          @config_stream = EM::HttpRequest.new(URI.parse(uri)).get params
+          @config_stream = EM::HttpRequest.new(URI.parse(uri),
+                                               :inactivity_timeout => 0).get params
+          @config_stream.errback do |http|
+            @on_error.call(self, http.error) if @on_error && http.error
+          end
           @config_stream.stream do |chunk|
             @parser << chunk
           end

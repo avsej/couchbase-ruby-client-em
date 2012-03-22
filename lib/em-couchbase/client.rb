@@ -24,7 +24,6 @@ module EventMachine
         include EM::Deferrable
 
         attr_reader :nodes
-        attr_reader :uri
         attr_reader :config
 
         def initialize
@@ -43,6 +42,9 @@ module EventMachine
         # @option options [String] :password (nil)
         def connect(options = {})
           @config_listener = ConfigurationListener.new
+          @config_listener.on_error do |listener, error|
+            @on_error.call(self, error) if @on_error
+          end
           @config_listener.on_upgrade do |config|
             @config = config
             config.nodes.each_with_index do |nn, ii|
@@ -68,6 +70,10 @@ module EventMachine
           end
           @config_listener.listen(options)
           self
+        end
+
+        def on_error(&callback)
+          @on_error = callback
         end
 
         def register_packet(opaque, packet)
