@@ -36,6 +36,7 @@ Gem::Specification.new do |s|
   s.require_paths = ['lib']
 
   s.add_runtime_dependency 'yajl-ruby', '~> 1.1.0'
+  # to use fixes from eventmachine master branch
   s.add_runtime_dependency 'eventmachine-le', '~> 1.1.0'
   s.add_runtime_dependency 'em-http-request', '~> 1.0.1'
 

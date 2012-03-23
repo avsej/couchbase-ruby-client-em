@@ -17,6 +17,7 @@
 
 require 'em-couchbase/version'
 require 'yajl/json_gem'
+# to use fixes from eventmachine master branch
 require 'eventmachine-le'
 require 'em-http'
 require 'uri'
