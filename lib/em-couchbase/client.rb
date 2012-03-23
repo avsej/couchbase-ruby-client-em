@@ -29,6 +29,7 @@ module EventMachine
         def initialize
           @opaque = 0
           @nodes = []
+          @admin_ports = []
           @packets = {}
           @upgrade_queue = EM::Queue.new
         end
@@ -43,22 +44,36 @@ module EventMachine
         def connect(options = {})
           @config_listener = ConfigurationListener.new
           @config_listener.on_error do |listener, error|
-            @on_error.call(self, error) if @on_error
+            if @admin_ports.empty?
+              @on_error.call(self, error) if @on_error
+            else
+              options = options.merge(@admin_ports.shuffle!.pop)
+              @config_listener.listen(options)
+            end
           end
           @config_listener.on_upgrade do |config|
             @config = config
             config.nodes.each_with_index do |nn, ii|
               if nodes[ii] != nn
-                nodes[ii].disconnect if nodes[ii]
-                options = nn.merge(:client => self)
-                nodes[ii] = Node.connect(options)
+                nodes[ii].close_connection if nodes[ii]
+                nodes[ii] = Node.connect(nn.merge(:client => self))
               end
             end
-            do_retry = lambda do |packet|
-              opaque, key, handler, raw = packet.values_at(:opaque, :key, :handler, :raw)
+            @admin_ports = nodes.map do |node|
+              host, port = node.admin.split(':')
+              {:hostname => host, :port => port}
+            end
+            do_retry = lambda do |payload|
+              opaque, packet = payload
+              key, handler, raw = packet.values_at(:key, :handler, :raw)
               register_handler(opaque, key, handler)
-              vbucket, node = locate(key)
-              raw[6...7] = [vbucket].pack("n")
+
+              vbucket = raw[6..7].unpack("n").first
+              if @config.vbucket_map_forward
+                @config.vbucket_map[vbucket] = @config.vbucket_map_forward[vbucket].dup
+              end
+              node = @nodes[@config.vbucket_map[vbucket][0]]
+
               register_packet(opaque, raw)
               node.callback do
                 node.send_data(raw)
@@ -111,7 +126,7 @@ module EventMachine
         # Locate node using vbucket distribution
         # @return [Fixnum] server index
         def locate(key)
-          digest = Zlib.crc32(key)
+          digest = Couchbase::Util.crc32_hash(key.to_s)
           mask = @config.vbucket_map.size - 1
           vbucket = digest & mask
           [vbucket, @nodes[@config.vbucket_map[vbucket][0]]]

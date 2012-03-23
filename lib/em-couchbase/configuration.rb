@@ -41,8 +41,8 @@ module EventMachine
       end
 
       class ConfigurationListener
-        attr_reader :on_upgrade
         attr_reader :config_stream
+        attr_reader :options
 
         def initialize
           @parser = Yajl::Parser.new
@@ -68,16 +68,19 @@ module EventMachine
         end
 
         def listen(options = {})
+          @options = {
+            :hostname => "localhost",
+            :port => 8091,
+            :pool => "default",
+            :bucket => "default"
+          }.merge(options)
           params = {:head => {}}
-          if options[:username] && options[:password]
-            params[:head][:authorization] = options.values_at(:username, :password)
+          (username, password) = auth = @options.values_at(:username, :password)
+          if username && password
+            params[:head][:authorization] = auth
           end
-          uri = "http://%s:%d/pools/%s/bucketsStreaming/%s/" % [
-            options[:hostname] || "localhost",
-            options[:port] || 8091,
-            options[:pool] || "default",
-            options[:bucket] || "default"
-          ]
+          uri = sprintf("http://%s:%d/pools/%s/bucketsStreaming/%s/",
+                        *@options.values_at(:hostname, :port, :pool, :bucket))
           @config_stream = EM::HttpRequest.new(URI.parse(uri),
                                                :inactivity_timeout => 0).get params
           @config_stream.errback do |http|
@@ -107,7 +110,7 @@ module EventMachine
           if nodes.empty?
             raise ArgumentError, "empty list of nodes"
           end
-          nodes.map! do |node|
+          nodes = nodes.map do |node|
             admin = node.fetch("hostname")
             ports = node.fetch("ports")
             {
