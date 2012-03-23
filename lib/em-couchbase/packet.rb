@@ -152,7 +152,11 @@ module EventMachine
               opaque,
               cas ) = header.unpack(RESPONSE_HEADER_FMT)
 
-            if data.length < bodylen
+            if magic != 0x81
+              fail Couchbase::Error::Protocol.new "Broken packet: #{header.inspect}"
+            end
+
+            if data.size < bodylen + RESPONSE_HEADER_SIZE
               return  # need moar data
             else
               data[0...RESPONSE_HEADER_SIZE] = ""
