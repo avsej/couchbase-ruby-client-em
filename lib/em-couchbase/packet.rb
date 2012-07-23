@@ -117,6 +117,29 @@ module EventMachine
               0,                # uint64_t  cas
               key
             ].pack("#{REQUEST_HEADER_FMT}a*")
+          when :incr, :decr
+            cmd_id = opcode == :incr ? CMD_INCREMENT : CMD_DECREMENT
+            key, delta, initial, expiration, cas = args.shift(5)
+            delta ||= 1
+            initial ||= 0
+            bodylen = key.size + 20
+            [
+              0x80,                   # uint8_t   magic
+              cmd_id,                 # uint8_t   opcode
+              key.size,               # uint16_t  keylen
+              20,                     # uint8_t   extlen (delta + initial + expiration)
+              0,                      # uint8_t   datatype
+              vbucket,                # uint16_t  vbucket
+              bodylen,                # uint32_t  bodylen
+              opaque || 0,            # uint32_t  opaque
+              cas || 0,               # uint64_t  cas
+              delta >> 32,            # uint64_t
+              delta & 0xffffffff,     #
+              initial >> 32,          # uint64_t
+              initial & 0xffffffff,   #
+              expiration || 0,        # uint32_t
+              key
+            ].pack("#{REQUEST_HEADER_FMT}NNNNNa*")
           when :sasl_auth
             mech, username, password = args.shift(3)
             value = "\0#{username}\0#{password}"
@@ -185,6 +208,14 @@ module EventMachine
             when CMD_GET
               result.operation = :get
               result.flags, _ = ext.unpack("N")
+            when CMD_INCREMENT
+              result.operation = :incr
+              hi, lo = result.value.unpack("NN")
+              result.value = hi << 32 | lo
+            when CMD_DECREMENT
+              result.operation = :decr
+              hi, lo = result.value.unpack("NN")
+              result.value = hi << 32 | lo
             else
               raise Couchbase::Error::UnknownCommand, header.inspect
             end

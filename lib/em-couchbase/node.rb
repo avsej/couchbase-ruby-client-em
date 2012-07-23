@@ -71,6 +71,20 @@ module EventMachine
           send_data(packet)
         end
 
+        def arithm(opcode, opaque, vbucket, key, options = {})
+          if options.is_a?(Fixnum)
+            options = {:delta => options}
+          end
+          packet = Packet.build(opaque, vbucket,
+                                opcode, key,
+                                options[:delta],
+                                options[:initial],
+                                options[:expiration],
+                                options[:cas])
+          client.register_packet(opaque, packet)
+          send_data(packet)
+        end
+
         # @param opaque [Fixnum]
         # @param pairs [Array] array of tuples +[opaque, vbucket, key]+
         # @param options [Hash]

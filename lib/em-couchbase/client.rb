@@ -164,6 +164,28 @@ module EventMachine
           end
         end
 
+        def incr(key, options = {}, &block)
+          callback do
+            opaque = opaque_inc
+            register_handler(opaque, key, block)
+            vbucket, node = locate(key)
+            node.callback do
+              node.arithm(:incr, opaque, vbucket, key, options)
+            end
+          end
+        end
+
+        def decr(key, options = {}, &block)
+          callback do
+            opaque = opaque_inc
+            register_handler(opaque, key, block)
+            vbucket, node = locate(key)
+            node.callback do
+              node.arithm(:decr, opaque, vbucket, key, options)
+            end
+          end
+        end
+
         protected
 
         def unbind

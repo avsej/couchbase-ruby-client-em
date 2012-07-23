@@ -13,5 +13,12 @@ Like any Deferrable eventmachine-based protocol implementation, using EM-Couchba
           end
         end
       end
+      couchbase.incr "bar", :initial => 100500 do |response|
+        if response.success?
+          couchbase.get "bar" do |response|
+            puts response.inspect
+            EM.stop
+          end
+        end
+      end
     end
-
